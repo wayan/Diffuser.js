@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script
+  src="https://code.jquery.com/jquery-3.5.1.min.js"
+  integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0="
+  crossorigin="anonymous"></script>
+<script src="Geometry.js"></script>
+<script src="Drawing.js"></script>
+<script src="SvgPath.js"></script>
+<script src="Fn.js"></script>
+<script src="FileSaver.js"></script>
+<script src="Interpolation.js"></script>
+<script src="Elipsis.js"></script>
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js" integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV" crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js" integrity="sha384-LtrjvnR4Twt/qOuYxE721u19sVFLVSA4hf/rRt6PrZTmiPltdZcI7q7PXQBYTKyf" crossorigin="anonymous"></script>
+
+</head>
+<body>
+
+<body class="bg-light">
+
+<h1>Krychle</h1>
+
+<div class="container">
+    <div id="diffuser-params-form-cont">
+        <form id="diffuser-params">
+            <div id="diffuser-params-body">
+            </div>
+            <div class="form-group row">
+                <div class="col-sm-10">
+                    <button type="submit" class="btn btn-primary">Redraw the diffuser</button>
+                    <button type="button" id="download-svg-button">Download SVG</button>
+                </div>
+            </div>
+        </form>
+    </div>
+    <div id="svg-cont"></div>
+</div>
+<script>
+    $(function(){
+        const params = Fn.getParams(),
+            ppi = ('ppi' in params? parseFloat(params.ppi): 117), 
+            showGrid = ('showGrid' in params? params['showGrid']: true),
+            w = new Drawing({ magnify: ppi / 2.54, showGrid: showGrid });
+
+        $('#download-svg-button').click((e) => {
+            const content = Fn.serializeSvg( $('svg') ),
+            blob = new Blob([content], {type: "image/svg+xml;charset=utf-8"});
+            saveAs(blob, "elipsis.svg");
+            return false;
+        });
+
+
+        function monge([x,y,z]){
+            return [ x, y ]; 
+            // return [ x, - z ]; 
+            // return [x,  y - z ];
+        }
+
+        const g = Geometry, pi = Math.PI, plane = [[8,0,0],[0,6,0],[0,0,8]],
+           norm = [1/8,1/6,1/8];
+
+        const A = g.planeLineIntersect(plane, [0,100].map(y => [-3,y,6])), 
+            S = g.planeLineIntersect(plane,[0,100].map(z => [-1,4,z])),
+            SB = g.unit( g.vectorMulti( g.dir(S,A), norm ), g.dist(S,A)),
+            B = g.add(S, SB),
+            C = g.add(S, g.dir(A,S)),
+            D = g.add(S, g.dir(B,S)),
+            aa = g.dist(A,B),
+            a = g.dist(A,S) * Math.sqrt(2),
+            norm2 = g.unit(norm, a),
+            [ E, F, G, H] = [A,B,C,D].map(p => g.add(p,norm2));
+
+
+        const pts3 = [A,B,C,D,E,F,G,H], names = ['A','B','C','D','E','F','G','H'],
+            pts = [a2,b2,c2,d2,e2,f2,g2,h2] = pts3.map(monge);
+
+        const axes = [[0,0,0], [8,0,0],[0,8,0],[0,0,8]].map(monge);
+
+        w.setViewbox( [ ... pts, ... axes, ... plane.map(monge) ] );
+        w.path( SvgPath.polyline([a2,b2,c2,d2], true));
+        w.path( SvgPath.polyline([e2,f2,g2,h2], true));
+
+        w.path( SvgPath.polyline([a2,e2]));
+        w.path( SvgPath.polyline([b2,f2]));
+        w.path( SvgPath.polyline([c2,g2]));
+        w.path( SvgPath.polyline([d2,h2]));
+
+
+        w.path( SvgPath.polyline(plane.map(monge),true), { 'stroke-dasharray': '10 10', 'stroke-width': 1 });
+        w.path( SvgPath.polyline([-10, 10].map(y=>[-3,y,6]).map(monge),true), { 'stroke-dasharray': '2 2', 'stroke-width': 1, 'stroke':'green' });
+
+
+        axes.forEach((p,i,ar) => {
+            if (i){
+                w.path( SvgPath.polyline([ ar[0], p ]), { 'stroke-dasharray': '2 2', 'stroke-width': 1, 'stroke':'blue' });
+            } 
+        });
+
+        names.forEach((name, i) => {
+            w.text( name,  pts[i] );
+            console.log(name, pts3[i])
+        });
+    
+
+
+/*
+console.log(ipts);
+
+        const pts = ipts.map( p => [ p[0], p[2] ]);
+        w.setViewbox( pts);
+        w.path( SvgPath.polyline(pts));
+
+        
+        w.setViewbox( pts2 );
+        w.path( SvgPath.polyline(pts2));
+        // w.setViewbox(ipts.map(xz));
+        w.path( SvgPath.polyline(ipts.map(xz)), { 'stroke-dasharray': '8 5 3 5', 'stroke-width': 1 } );
+        pts.forEach(
+            p => w.path( SvgPath.polyline( [[0,0], xz(p)]))
+        );
+*/
+    });
+</script>
+
+</body>
+</html>

@@ -7,37 +7,41 @@
   crossorigin="anonymous"></script>
 <script src="Geometry.js"></script>
 <script src="Drawing.js"></script>
+<script src="SvgPath.js"></script>
 <script src="Diffuser.js"></script>
+<script src="DiffuserShape3.js"></script>
+<script src="DiffuserShort.js"></script>
 <script src="Fn.js"></script>
 <script src="FileSaver.js"></script>
+<script src="Page.js"></script>
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js" integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV" crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js" integrity="sha384-LtrjvnR4Twt/qOuYxE721u19sVFLVSA4hf/rRt6PrZTmiPltdZcI7q7PXQBYTKyf" crossorigin="anonymous"></script>
 
-<script>
-jQuery(function($){
-    const rawParams = Fn.hashParams(), 
-        ppi = ('ppi' in rawParams? parseFloat(rawParams.ppi): 157), 
-        w = new Drawing({ magnify: ppi / 2.54, }),
-        shape = rawParams['shape'] || 1,
-        diffuser = Diffuser(shape),
-        params = diffuser.parseParams(rawParams);
-
-    diffuser.create(params, w);
-
-    $('#download-svg-link').click((e) => {
-        const content = Fn.serializeSvg( $('svg') ),
-        blob = new Blob([content], {type: "image/svg+xml;charset=utf-8"});
-        saveAs(blob, "diffuser.svg");
-        return false;
-    });
-});
-</script>
 </head>
 <body>
 
-<a id="download-svg-link" >Download SVG</a>
+<body class="bg-light">
 
-<svg width="1800" height="1000">
-  Sorry, your browser does not support inline SVG.
-</svg>
+<div class="container">
+    <h2 class="mb-0">
+        <button class="btn btn-link" type="button" id="diffuser-params-toggle">Diffuser parameters</button>
+    </h2>
+    <div id="diffuser-params-form-cont" class="d-none">
+        <form id="diffuser-params">
+            <div id="diffuser-params-body">
+            </div>
+            <div class="form-group row">
+                <div class="col-sm-10">
+                    <button type="submit" class="btn btn-primary">Redraw the diffuser</button>
+                    <button type="button" id="download-svg-button">Download SVG</button>
+                </div>
+            </div>
+        </form>
+    </div>
+    <div id="svg-cont"></div>
+</div>
+
 
 </body>
 </html>

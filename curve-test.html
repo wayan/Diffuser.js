@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script
+  src="https://code.jquery.com/jquery-3.5.1.min.js"
+  integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0="
+  crossorigin="anonymous"></script>
+<script src="Geometry.js"></script>
+<script src="Curve.js"></script>
+<script src="Drawing.js"></script>
+<script src="SvgPath.js"></script>
+<script src="Fn.js"></script>
+<script src="FileSaver.js"></script>
+<script src="Interpolation.js"></script>
+<script src="Concave-curve.js"></script>
+<script src="Polar.js"></script>
+<script src="Bezier.js"></script>
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js" integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV" crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js" integrity="sha384-LtrjvnR4Twt/qOuYxE721u19sVFLVSA4hf/rRt6PrZTmiPltdZcI7q7PXQBYTKyf" crossorigin="anonymous"></script>
+
+</head>
+<body>
+
+<body class="bg-light">
+
+<h1>Test curve</h1>
+
+<div id="svg-cont"></div>
+
+<script>
+$(function(){   
+    function xz(p){
+        return [ p[0], p[2] ]
+    }
+
+    function parseBoolean(v){
+        return v != '0' && v != '' && v != 'false' && v != 'no';
+    }
+
+    /* parsing params */
+    function parseParams(query){
+        const defaultDims = {
+            lensRadius: 2.7, 
+            depth: 14, 
+            width: 24, 
+            height: 14, 
+            complete: 0,
+            wrapWidth: 2.5,
+            wrapDeg : 120,
+            complete: true,
+            angles: 360,
+            reflectorThickness: 0.1,    
+            flashTop: 11.2,
+            flashWidth: 6.0,
+            flashCoverDepth: 3.0,
+            flashCoverHeight: 4.0, 
+            sliceAt: -2.0
+        },
+        defaults = { 
+            ... defaultDims,
+            ppi : 157,
+            showGrid: true,
+            frontShape: '1',
+            sideShape: '1',
+        }, 
+        sent = 'sent' in query,
+        defaultViews = [ 'unfold' ],
+        defaultCuts = [ 'diffuser' ],
+        C = { sent };
+
+        Object.keys(defaults).forEach(k => {
+            if ( ['complete', 'showGrid', 'sent'].includes(k) ){
+                C[k] = k in query? parseBoolean(query[k]): sent? false: defaults[k];
+                return;
+            }
+
+            if (! (k in query) ){
+                C[k] = defaults[k];
+                return;
+            }
+
+            const v = query[k];
+            C[k] = [ ... Object.keys(defaultDims), 'ppi'].includes(k)
+                ? parseFloat(v) 
+                : ['angles'].includes(k)
+                ? parseInt(v)
+                : ['frontShape', 'sideShape'].includes(k)
+                ? (['1','2','3', '4'].includes(v)? v: defaults[k])
+                : v;
+        });
+        C.views = ['unfold', 'front', 'side', 'top', 'slice'].filter(v => {
+            const k = 'view_' + v;
+            return k in query? parseBoolean(query[k]): sent? false: defaultViews.includes(v);
+        });
+
+        const cuts = ['diffuser', 'reflector'].filter(v => {
+            const k = 'view_' + v;
+            return k in query? parseBoolean(query[k]): sent? false: defaultViews.includes(v);
+        });
+
+        C.cuts = cuts.length ? cuts: defaultCuts
+        return C;
+    }
+
+    const C = parseParams( Fn.getParams()),
+        w = new Drawing({ magnify: C.ppi / 2.54, showGrid: C.showGrid })
+        // back = Concave.backRimForDiffuser(C), 
+        back = Concave.backRimForReflector(C), 
+        front = Concave.frontRimFor(C)
+
+
+    const rim = Concave.unfoldRim( front, back )
+    const curve = Curve.fromPoints( rim.map( r => r.front ) )
+    const pts = Concave.rimOutline(rim)
+    const flaps = [ 0.1, 0.2, 0.35, 0.5, 0.65, 0.8, 0.9].map(
+        at => Concave.curveFlap(curve, at, 1.5, 1.5)
+    )
+
+    w.setViewbox( [ ... pts , ... flaps.flat() ] )
+    w.path(SvgPath.polyline(pts));
+
+    for(let y of Fn.between(-4, 4, 1)){
+        const slice = Concave.buildRimSlice(front, back, y)
+        w.path(SvgPath.polyline( Fn.between(0,1,200).map(slice)));
+    }
+    for(let r of [back, front]){
+        w.path(SvgPath.polyline( Fn.between(0,1,200).map(r).map(xz) ));
+    }
+    for (let flap of flaps ){
+        w.path(SvgPath.polyline( flap));
+    }
+});
+</script>
+
+</body>
+</html>

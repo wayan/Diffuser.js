@@ -1,11 +1,6 @@
 var Diffuser = (function(){
-    function pointNote(w, p, title){
-        const d2 = p['d2']? p.d2: p;
-        w.text(title, d2);
-    }
-
     const g = Geometry,
-        pSymY = ( lines => [].concat(lines.map(g.d2),lines.reverse().map(g.d2).map(g.symY))),
+        pSymY = ( line => [].concat(line, line.map(g.symY).reverse())),
         diffuser = function(){};
 
     diffuser.prototype.parseParams = function(p){
@@ -16,6 +11,10 @@ var Diffuser = (function(){
                 return acc;
             }, {});
     };
+
+    diffuser.prototype.pointNote = function(w, p, title){
+        w.text(title, p);
+    }
 
     diffuser.prototype.foldInStyle  = { 'stroke-dasharray': '10 10', 'stroke-width': 1 };
     diffuser.prototype.foldOutStyle = { 'stroke-dasharray': '8 5 3 5', 'stroke-width': 1 }; 
@@ -59,103 +58,143 @@ var Diffuser = (function(){
             M3 = g.unfold(S2, M2, [x3, y3, -D.down]),
             B2f = g.unfold(M3, M2, [x2_b, y2_f, -D.down]),
             B2b = g.unfold(B2f, M2, [x2_b, y2_b, -D.down]),
-            M1_1 = g.unfold(B2b, M2, M1.d3),
+            M1_1 = g.unfold(B2b, M2, g.d3(M1)),
             B1   = g.unfold(B2b, M1_1, [x1, y1, -D.down]),
-            M0_1 = g.unfold(B1, M1_1, M0.d3),
-            B0   = g.unfold(B1, M1_1, [x1, 0, -D.down]),
-            outline = pSymY([
-                S0, 
-                M0, 
-                M1,
-                g.flapPoint(M1.d2, M2.d2, -1, 1),
-                g.flapPoint(M2.d2, M1.d2, 1, 2.5),
-                M2.d2,
-                g.flapPoint(M2.d2, M1_1.d2, -1, 2.5),
-                g.flapPoint(M1_1.d2, M2.d2, 1, 1),
-                M1_1.d2,
-                g.flapPoint(M1_1.d2, M0_1.d2, - D.diffuserFlapWidth),
-                g.flapPoint(M0_1.d2, M1_1.d2,  D.diffuserFlapWidth),
-                M0_1.d2,
-                B0,
-                B1,
-                g.flapPoint(B1.d2, B2b.d2, - D.diffuserFlapWidth),
-                g.flapPoint(B2b.d2, B1.d2,  D.diffuserFlapWidth),
-                B2b,
-                g.flapPoint(B2b.d2, B2f.d2, - D.diffuserFlapWidth),
-                g.flapPoint(B2f.d2, B2b.d2,  D.diffuserFlapWidth),
-                B2f,
-                g.flapPoint(B2f.d2, M3.d2, - D.diffuserFlapWidth),
-                g.flapPoint(M3.d2, B2f.d2,  D.diffuserFlapWidth),
-                M3,
-                g.flapPoint(M3.d2, g.symY(M3.d2), - D.diffuserFlapWidth )
+            M0_1 = g.unfold(B1, M1_1, g.d3(M0)),
+            B0   = g.unfold(B1, M1_1, [x1, 0, -D.down]);
+
+        const outline = [], pushLines = (points) => points.forEach( (p) => outline.push(w.LineTo(p)) );
+
+        outline.push( w.LineTo(M0), w.LineTo(M1));
+
+        const connectionFlap = function(M1, M2, dx1, dx2){
+            const l = g.rotator(M1, M2), r = g.rotator(M2, M1), dy = 1.5, ww = 0.5;
+            pushLines([ 
+                l( [dx1 + ww , 0] ), 
+                l( [ dx1 + ww, - ww] ),
             ]);
 
+            w.roundPath(outline, 0.2);
 
-        //console.log(JSON.stringify(['t2', v0, v1, [x2, y2, D.up]]));
-		//w.setViewbox([ B0, B1, B2b, B2f, M0, M0_1, M1, M1_1, M2, M3, S0, S1, S2 ].map(g.d2).map(
-			//p => [p, g.symY(p)] ).reduce( (a,pp) => a.concat(pp) ));
+            pushLines([ l( [ dx1 , - ww ]) ]);
 
-        w.setViewbox(outline);
+            w.roundPath(outline, 0.2);
 
-        pointNote(w, S0, 'S0');
-        pointNote(w, S1, 'S1');
-        pointNote(w, M0, 'M0');
-        pointNote(w, M1, 'M1');
-        pointNote(w, S2, 'S2');
-        pointNote(w, M2, 'M2');
-        pointNote(w, M3, 'M3');
-        pointNote(w, B2f, 'B2f');
-        pointNote(w, B2b, 'B2b');
-        pointNote(w, M1_1, 'M1_1');
-        pointNote(w, B1, 'B1');
-        pointNote(w, M0_1, 'M0_1');
-        pointNote(w, B0, 'B0');
+            pushLines([
+                l([dx1, - dy]), 
+                r( [dx2, dy]) 
+            ])
 
-        w.polyline( outline.map(g.d2) );
-        for(var sym of [false,true]){
-            var t = sym? ( l => l.map(g.symY).reverse()): ( l => l );
+            w.roundPath(outline, 0.3)
 
-            w.polyline(
-                t([ B1, B2b, B2f, M3].map(g.d2)),
-                this.foldOutStyle
-            );
-            w.polyline(
-                t([ M3.d2, g.symY(M3.d2)]),
-                this.foldOutStyle
-            ),
-            w.polyline(
-                t([ M0_1, M1_1].map(g.d2)),
-                this.foldInStyle
-            );
-            w.polyline(
-                t([ M1, M2, M1_1].map(g.d2)),
-                this.foldOutStyle
-            );
-            w.polyline(
-                t([ M1_1, B1].map(g.d2)),
-                this.foldOutStyle
-            );
-            w.polyline(
-                t([ M2, B2b].map(g.d2)),
-                this.foldInStyle
-            );
-            w.polyline( 
-                t([ M2.d2, g.symY(M2.d2) ] ),
-                this.foldInStyle
-            );
-            w.polyline( 
-                t([ M1.d2, g.symY(M1.d2) ] ),
-                this.foldOutStyle
-            );
-            w.polyline( 
-                t([ M2.d2, B2f.d2 ] ),
-                this.foldInStyle
-            );
-            w.polyline( 
-                t([ M2.d2, M3.d2 ] ),
-                this.foldInStyle
-            );
+            pushLines([
+                r( [ dx2 , ww ]),
+            ])
+
+            w.roundPath(outline, 0.3)
+
+            pushLines([
+                r( [ dx2 + ww, ww ]),
+                //r( [ dx + dy / 3, dy / 3 ]),
+                // r( [ dx,  dy / 3] ),
+                r([dx2 + ww, 0]) 
+            ])
+
+            w.roundPath(outline, 0.2)
+            pushLines([M2]);
+            w.roundPath(outline, 0.2)
         }
+
+        connectionFlap(M1, M2, 1.5, 2.2);
+        connectionFlap(M2, M1_1, 2.2, 1.5);
+
+        { 
+            const fp1 = g.flapPoint(M1_1, M0_1, - D.diffuserFlapWidth),
+                fp2 = g.flapPoint(M0_1, M1_1,  D.diffuserFlapWidth);
+
+            const [p1, p2, p3 ] = g.roundPoints(M1_1, fp1, fp2, 0.5);
+            outline.push( w.LineTo(fp1) )
+
+            //outline.push( w.LineTo( p1 ) )
+            //outline.push( w.BezierQ(p2, p3) )
+            outline.push( w.LineTo(fp2)  )
+            w.roundPath( outline, 0.4 )
+            outline.push( w.LineTo(M0_1) )
+        }
+
+        pushLines([
+            B0,
+            B1,
+            g.flapPoint(B1, B2b, - D.diffuserFlapWidth),
+            g.flapPoint(B2b, B1,  D.diffuserFlapWidth),
+            B2b,
+            g.flapPoint(B2b, B2f, - D.diffuserFlapWidth),
+            g.flapPoint(B2f, B2b,  D.diffuserFlapWidth),
+            B2f,
+            g.flapPoint(B2f, M3, - D.diffuserFlapWidth),
+            g.flapPoint(M3, B2f,  D.diffuserFlapWidth),
+            M3,
+            g.flapPoint(M3, g.symY(M3), - D.diffuserFlapWidth)
+        ])
+
+
+        w.transformPath(g.symY, outline).reverse().forEach( (command) => outline.push(command));
+        outline.push(w.LineTo(M0));
+        outline.unshift(w.MoveTo(M0));
+
+        w.setViewbox(w.pathPoints(outline))
+
+        this.pointNote(w, S0, 'S0');
+        this.pointNote(w, S1, 'S1');
+        this.pointNote(w, M0, 'M0');
+        this.pointNote(w, M1, 'M1');
+        this.pointNote(w, S2, 'S2');
+        this.pointNote(w, M2, 'M2');
+        this.pointNote(w, M3, 'M3');
+        this.pointNote(w, B2f, 'B2f');
+        this.pointNote(w, B2b, 'B2b');
+        this.pointNote(w, M1_1, 'M1_1');
+        this.pointNote(w, B1, 'B1');
+        this.pointNote(w, M0_1, 'M0_1');
+        this.pointNote(w, B0, 'B0');
+
+        const foldInPath = [], foldOutPath = [];
+
+        [ (l => l), g.symY ].forEach( (t) => {
+            foldOutPath.push(
+                w.MoveTo(t(B1)),
+                w.LineTo(t(B2b)),
+                w.LineTo(t(B2f)),
+                w.LineTo(t(M3)),
+
+                w.MoveTo(t(M1)),
+                w.LineTo(t(M2)),
+                w.LineTo(t(M1_1)),
+
+                w.LineTo(t(B1))
+            );
+
+            foldInPath.push(
+                w.MoveTo(t(M0_1)),
+                w.LineTo(t(M1_1)),
+                w.MoveTo(t(B2b)),
+                w.LineTo(t(M2 )),
+                w.LineTo(t(B2f)),
+                w.MoveTo(t(M2 )),
+                w.LineTo(t(M3))
+            );
+        });
+
+        foldOutPath.push(
+            w.MoveTo(M1), w.LineTo(g.symY(M1)),
+            w.MoveTo(M3), w.LineTo(g.symY(M3))
+        );
+        foldInPath.push(w.MoveTo(M2), w.LineTo(g.symY(M2)));
+
+        w.path2( outline );
+        w.path2( foldOutPath, this.foldOutStyle );
+        w.path2( foldInPath, this.foldInStyle );
+
         return;
     };
 
@@ -188,60 +227,80 @@ var Diffuser = (function(){
             S1 = g.proj([x1, y0, D.up]),
             S2 = g.unfold(S0, S1, [x3, y1, -D.down]),
             S3 = g.unfold(S2, S1, [x2, y0, -D.down]);
-            Sout = g.unfold(S2, S1, g.intersect(S2.d3, S3.d3, 0, xf)),
-            Sin = g.unfold(S3, S2, g.intersect(S1.d3, S2.d3, 0, xf)),
-            Ft = g.unfold(S2, Sin, g.intersect(Sin.d3, Sout.d3, 2, 0)),
-            Fb = g.unfold(S2, Sin, g.intersect(Sin.d3, Sout.d3, 2, -D.flashHeight)),
-            yfb = Fb.d3[1] - D.flashLength,
-            yft = Ft.d3[1] - D.flashLength,
+            Sout = g.unfold(S2, S1, g.intersect(g.d3(S2), g.d3(S3), 0, xf)),
+            Sin = g.unfold(S3, S2, g.intersect(g.d3(S1), g.d3(S2), 0, xf)),
+            Ft = g.unfold(S2, Sin, g.intersect(g.d3(Sin), g.d3(Sout), 2, 0)),
+            Fb = g.unfold(S2, Sin, g.intersect(g.d3(Sin), g.d3(Sout), 2, -D.flashHeight)),
+            yfb = g.d3(Fb)[1] - D.flashLength,
+            yft = g.d3(Ft)[1] - D.flashLength,
             ffb = (p => p.map( (x,i) => i == 1? yft: x )),
-            Ftb = g.unfold(Fb, Ft, ffb(Ft.d3)),
-            Fbb = g.unfold(Fb, Ft, ffb(Fb.d3)),
-            outline = pSymY([
-                S0, S1, Ft,
-                g.unfold(Ftb, Ft, [x0, Ft.d3[1], Ft.d3[2]]),
-                g.unfold(Ftb, Ft, [x0, Ftb.d3[1], Ftb.d3[2]]),
+            Ftb = g.unfold(Fb, Ft, ffb( g.d3(Ft))),
+            Fbb = g.unfold(Fb, Ft, ffb( g.d3(Fb))),
+            outline = [];
+
+            [
+                S1, Ft,
+                g.unfold(Ftb, Ft, [x0,  g.d3(Ft)[1],  g.d3(Ft)[2]]),
+                g.unfold(Ftb, Ft, [x0,  g.d3(Ftb)[1], g.d3(Ftb)[2]]),
                 Fbb, Fb, S3,
-                g.flapPoint(S3.d2, S2.d2, - D.diffuserFlapWidth),
-                g.flapPoint(S2.d2, S3.d2,  D.diffuserFlapWidth),
+                g.flapPoint(S3, S2, - D.diffuserFlapWidth),
+                g.flapPoint(S2, S3,  D.diffuserFlapWidth),
                 S2,
-                g.flapPoint(S2.d2, g.symY(S2.d2), - D.diffuserFlapWidth)   
-            ]),
-            nothing = null;
+                g.flapPoint(S2, g.symY(S2), - D.diffuserFlapWidth)   
+            ].forEach( p => outline.push(w.LineTo(p)));
+                
             
-        /* bounding box */
-        //var points = (l => [].concat(l, l.map(g.symY)))([S0, S1, S2, S3, Ft, Fb, Ftb, Fbb].map(g.d2));
-        w.setViewbox(outline);
+            /* bounding box */
+            //var points = (l => [].concat(l, l.map(g.symY)))([S0, S1, S2, S3, Ft, Fb, Ftb, Fbb].map(g.d2));
 
-        pointNote(w, S0, 'S0');
-        pointNote(w, S1, 'S1');
-        pointNote(w, S2, 'S2');
-        pointNote(w, S3, 'S3');
-        pointNote(w, Ft, 'Ft');
-        pointNote(w, Fb, 'Fb');
-        pointNote(w, Ftb, 'Ftb');
-        pointNote(w, Fbb, 'Fbb');
+        w.transformPath(g.symY, outline).reverse().forEach(command => outline.push(command))
+        outline.unshift( w.MoveTo(S0) );
+        outline.push(w.LineTo(S0));
+        w.setViewbox( w.pathPoints(outline) );
 
-        w.polyline(outline);
+        this.pointNote(w, S0, 'S0');
+        this.pointNote(w, S1, 'S1');
+        this.pointNote(w, S2, 'S2');
+        this.pointNote(w, S3, 'S3');
+        this.pointNote(w, Ft, 'Ft');
+        this.pointNote(w, Fb, 'Fb');
+        this.pointNote(w, Ftb, 'Ftb');
+        this.pointNote(w, Fbb, 'Fbb');
+
+        const foldInPath = [], foldOutPath = [];
 
         for(var sym of [false,true]){
-            var d2 = (l => l.map(g.d2)), tr = sym? ( l => d2(l).map(g.symY).reverse()): d2; 
+            var trp = (sym? g.symY: (l=>l) );
 
-            w.polyline(tr([Ft,Ftb]), this.foldInStyle);
-            w.polyline(tr([Ft,Fb]), this.foldOutStyle);
-            w.polyline(tr([S3,S2]), this.foldOutStyle);
-            w.polyline(tr([S2.d2,g.symY(S2.d2)]), this.foldOutStyle);
-            w.polyline(tr([S1,S2]), this.foldInStyle);
+            foldInPath.push(
+                w.MoveTo( trp(Ft) ),
+                w.LineTo( trp(Ftb) ),
+                w.MoveTo( trp(S1) ),
+                w.LineTo( trp(S2) )
+            );
+
+            foldOutPath.push(
+                w.MoveTo(trp(Ft)),
+                w.LineTo(trp(Fb)),
+                w.MoveTo(trp(S3)),
+                w.LineTo(trp(S2))
+            );
         }
 
-        w.path(
-            [
-                w.pathMoveTo(Ftb.d2),
-                w.pathBezierQ(Fb.d2, Fbb.d2)
-            ]
-        );
+        foldOutPath.push(w.MoveTo(S2),w.LineTo(g.symY(S2)));
+
+        w.path2(outline);
+        w.path2(foldInPath, this.foldInStyle);
+        w.path2(foldOutPath, this.foldOutStyle);
 
         return;
     };
-    return ((shape) => shape == 1? shape1:shape2);
+
+    const shapes = {
+        '1' : ()=>shape1,
+        '2' : ()=>shape2,
+        '3' : ()=>DiffuserShape3(diffuser),
+        '4' : ()=>DiffuserShort(diffuser)
+    }
+    return ((shape) => shapes[ shapes[shape] ? shape: 1 ]() );
 })();
