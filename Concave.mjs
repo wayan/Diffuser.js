@@ -83,7 +83,7 @@ export function buildDiffuser(C){
                 bez3([w2, 0], [w2,C.height], [xShift, C.height]),
                 (fnY => ([x,z]) => [x, fnY(z), z ])( 
                     /* Y by Z */
-                    curve.linear([ 0, C.height], [2/3*C.depth, C.depth]) 
+                    curve.linear([ 0, C.height], [ 1/2*C.depth, C.depth]) 
                 )
         ))
 

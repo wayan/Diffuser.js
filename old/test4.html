@@ -1,0 +1,171 @@
+<html>
+<head>
+<script
+  src="https://code.jquery.com/jquery-3.5.1.min.js"
+  integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0="
+  crossorigin="anonymous"></script>
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js" integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV" crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js" integrity="sha384-LtrjvnR4Twt/qOuYxE721u19sVFLVSA4hf/rRt6PrZTmiPltdZcI7q7PXQBYTKyf" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/delaunator@5.0.0/delaunator.min.js"></script>
+</head>
+<body>
+
+<body class="bg-light">
+
+<h1>Sample ES6</h1>
+
+<script type="module">
+    import curve from './Curve.mjs'
+    import svg   from './Svg.mjs'
+    import draw  from './Draw.mjs'
+    import bezier from './Bezier.mjs'
+    import util   from './Util.mjs'
+
+    function buildSvg(C, points, content = []){
+        const bbox = boudingBox( points ), [from, size] = viewBox( bbox )
+
+        return svg.build(
+            'svg',
+            {
+                viewBox: [ ... from, ... size ].join(' '),
+                width:  size[0] + 'cm',
+                height: size[1] + 'cm'
+           },
+           [ 'path', { d: svg.polylines( draw.gridLines(bbox,5)), style:draw.lineStyle.grid5 } ],
+           [ 'path', { d: svg.polylines( draw.gridLines(bbox,-5)), style:draw.lineStyle.grid } ],
+           ... content
+        );
+    }
+
+    function boudingBox(points){
+        return [ Math.min, Math.max ].map(f => (p1, p2) => p1.map( (x,i) => f(x, p2[i]) )).map(f => points.reduce(f))
+    }
+
+    function viewBox(points){
+        const [min, max] = boudingBox(points) 
+
+        const from = min.map(Math.floor), to = max.map(Math.ceil)
+        return [ from, to.map((x,i) => x - from[i]) ]
+    }
+
+    function drawFn(f){
+        const pts = [], n = 100
+        for(let i = 0 ; i <= n; i++){
+            pts.push( f(i/n) ) 
+        }
+        return pts
+    }
+
+    function shapeOutline(shape){   
+        const rendered = curve.renderPlane(shape)
+        return [
+            ... rendered.map((r) => r.c[0]),
+            ... rendered.map((r) => r.c[1]).reverse(),
+            rendered[0].c[0]
+        ]
+    }
+
+    function curveOutline(c){
+        const rendered = curve.render(c)
+        return rendered.map(r => r.c)
+    }
+
+    /* function composition */
+    function fc(...fns){
+        return (t) => fns.reduce((acc, f) => f(acc), t);
+    }
+
+    const fMeike = { flashHeight: 2.7, flashBottomHeight: 8.5, flashBackShift: 1, flashWidth: 6},
+        fGodox = { flashHeight: 3.6, flashBottomHeight: 11.5, flashBackShift: 2, flashWidth: 6.4, height: 3.6 + 11.5}
+
+    const flashType = 'Godox';
+    // const flashType = 'Meike'
+
+    const C = {
+        ppi: 157,
+        width: 24,
+        // timesRange: [0.25, 0.85],
+        height:14, depth: 12,  lensRadius: 3.0,  frontFlapWidth:1.2, frontFlapDepth: 2.0, 
+        frontFlapThickness: 0.8, frontFlapSocketThickness: 0.6,
+        ... ( flashType == 'Meike'? fMeike: {}),
+        ... ( flashType == 'Godox'? fGodox: {})
+   };
+
+    const viewboxes = []
+
+    {
+        const T1 = [0,0], T2 = [ 0, C.lensRadius + 4], T3 = [ C.depth, C.height],
+            T2b = curve.poly([T2,T1])(0.2),
+            T2a = curve.poly([T2,T3])(0.1)
+
+        const c = curve.concat([
+            curve.poly([T1,T2b]),
+            bezier.generator([T2b,T2,T2a]),
+            curve.poly([T2a,T3])
+        ])
+        const cc = curve.poly( curve.pointsOf(c), { dist: (p,q)=>Math.abs(p[1]-q[1]) })
+
+        const outline = curve.pointsOf(cc),
+            shortline = (p) => [p, [p[0]+3,p[1]]],
+            style1 = draw.lineStyle.sketch,
+            style2 = { ... style1, stroke: 'green' }
+
+        viewboxes.push( buildSvg(
+            C, 
+            outline,
+            [
+                [ 'path', { d: svg.poly( outline), style:draw.lineStyle.sketch } ],
+                [ 'path', { d: svg.polys( util.steps(0,1,10).map(c).map(shortline)),  style:style1 } ],
+                [ 'path', { d: svg.polys( util.steps(0,1,10).map(cc).map(shortline)), style:style2 } ],
+            ]
+         )
+        )
+    }
+
+    {
+        const w = 0.3, 
+            h = 6,
+            T1 = [0,0],  T2 = [2,h], T3 = [10 - 10 *w,h], T4 = [10+10*w,h], T5 = [20 - 2,h], T6 = [20,0],
+            c = curve.concat([
+                bezier.generator([T1,T2,T3]),
+                curve.poly([T3,T4]),
+                bezier.generator([T4,T5,T6]),
+            ]),
+            outline = curve.pointsOf(c)
+
+        viewboxes.push(     
+            buildSvg(
+                C, 
+                outline,
+                [
+                    [ 'path', { d: svg.poly( outline ), style:draw.lineStyle.sketch } ],
+                ]
+         )
+        )
+    }
+
+    $(function(){
+        for(const viewbox of viewboxes){
+            $('#projections').append( viewbox);
+        }
+    })
+
+
+
+</script>
+
+<div class="container">
+    <h2 class="mb-0">
+        <button class="btn btn-link" type="button" id="concave-params-toggle">Parameters</button>
+    </h2>
+
+    <div id="projections">
+    </div>
+</div>
+
+<script>
+</script>
+
+</body>
+</html>

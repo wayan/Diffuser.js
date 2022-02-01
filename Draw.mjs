@@ -351,4 +351,4 @@ function initPage(o = {}){
     initProjections(C, rf, $root, query)
 }
 
-export default { viewBox, gridLines, boudingBox, styles, projections, poly, polys, svgElem, initPage }
+export default { viewBox, gridLines, boudingBox, styles, projections, poly, polys, svgElem, initPage, downloadSketch }

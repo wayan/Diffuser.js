@@ -1,0 +1,148 @@
+<html>
+<head>
+<script
+  src="https://code.jquery.com/jquery-3.5.1.min.js"
+  integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0="
+  crossorigin="anonymous"></script>
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js" integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV" crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js" integrity="sha384-LtrjvnR4Twt/qOuYxE721u19sVFLVSA4hf/rRt6PrZTmiPltdZcI7q7PXQBYTKyf" crossorigin="anonymous"></script>
+<script src="FileSaver.min.js"></script>
+<script type="module">
+    import draw  from './Draw.mjs'  
+    import db    from './DOMBuilder.mjs' 
+    import g     from './Geometry.mjs'
+    import curve from './Curve.mjs'
+    import {fc, fmap} from './Util.mjs'
+
+    function perp([x,y], len = 1){
+        return g.unitVector([y,-x], len)
+    }
+
+    function socketPoints( [P1,P2], [atAbs, atRel], width, depth ){
+        const pb = g.pointBetween(P1, P2),
+            len = g.dist(P1, P2),
+            at = atAbs + len * atRel,
+            p1 = pb(  at / len  ),
+            p2 = pb( (at + width) / len ),
+            v1 = g.vector(P1)(P2),
+            v = g.add( perp(v1, depth) )
+
+        return [ p1, v(p1), v(p2), p2 ]
+    }
+
+    const C = (() => {
+        const flashWidth = 6.2;
+        return {
+            width:  25.5,
+            depth:  25.5,
+            flashWidth,
+            height:  6.5,
+            start:  3,
+            widthAtStart: flashWidth,
+            flapWidth: 1.5,
+            flapSocketThickness: 0.8,
+            flapSocketWidth: 3, 
+            flapDentDepth: 1.5
+        };
+    })();
+
+    function drawReflector(){
+        const P0 = [0,0], P1 = [ C.flashWidth / 2, 0 ], P2 = [ C. width / 2, C.depth ],
+            p3 = [  
+                0.5 * ( C.flashWidth * (C.depth - C.start) + C.width * C.start ) / C.depth + C.widthAtStart,
+                C.start, 
+                - C.height 
+            ],
+            P4 = [0, C.depth ],
+            P3 = curve.unfoldPoint([ ... P2, 0 ], P2, [... P1, 0 ], P1, p3 ),
+            p0d = [ 0, C.start, - C.height ],
+            P3d = curve.unfoldPoint([ ... P2, 0 ], P2, [... P4, 0 ], P4, p3 ),
+            P0d = curve.unfoldPoint([ ... P2, 0 ], P2, [... P4, 0 ], P4, p0d )
+
+
+        const reflector = (() => {
+            const vadd = g.add( perp( g.vector( P3)(P2), C.flapWidth ))
+            const tadd = g.add( perp( g.vector( P2)(P4), C.flapWidth ))
+
+
+            /* side socket */
+
+            const lines = [
+                [ P0,P1,P3,P2,P1 ],
+                [ P0,P4,P2 ],
+                /* flaps */
+                [ P3, vadd(P3), vadd(P2), P2 ],
+                [ P2, tadd(P2), tadd(P4), P4 ],
+
+                /* side sockets */
+                ...  [ [1.5, 0], [ -C.flapSocketWidth / 2, 0.5 ], [ - ( C.flapSocketWidth + 1.5), 1 ] ].map( at => socketPoints( [ P2, P3], at, C.flapSocketWidth, - C.flapSocketThickness)),
+                /* front sockets */
+                socketPoints([P4,P2], [0,0], C.flapSocketWidth / 2, - C.flapSocketThickness ),
+                socketPoints([P4,P2], [-C.flapSocketWidth - 1.5, 1], C.flapSocketWidth, - C.flapSocketThickness )
+            ]
+        
+            const content = [
+                [ 'path', { d: draw.polys(lines), style:draw.styles.sketch } ]
+            ];
+            return draw.svgElem( lines.flat(), content);
+        })()
+
+        const diffuser = (() => {
+
+            const lines = [
+                [ P0d,P3d,P2,P4,P0d ],
+
+                /* side sockets */
+                ...  [ [1.5, 0], [ -C.flapSocketWidth / 2, 0.5 ], [ - ( C.flapSocketWidth + 1.5), 1 ] ].map( at => socketPoints( [ P2, P3d], at, C.flapSocketWidth, - C.flapDentDepth)),
+
+                /* front sockets */
+                socketPoints([P4,P2], [0,0], C.flapSocketWidth / 2, - C.flapDentDepth ),
+                socketPoints([P4,P2], [-C.flapSocketWidth - 1.5, 1], C.flapSocketWidth, - C.flapDentDepth )
+            ]
+        
+            const content = [
+                [ 'path', { d: draw.polys(lines), style:draw.styles.sketch } ]
+            ];
+            return draw.svgElem( lines.flat(), content);
+        })()
+
+        $('#flat-sketch').append(reflector.sketch)
+        $('#flat-sketch').append(diffuser.sketch)
+
+        $('#download-reflector').click(
+            function(){
+                draw.downloadSketch(reflector.sketch, 'flat-reflector.svg')
+                return false
+            }
+        )
+        $('#download-diffuser').click(
+            function(){
+                draw.downloadSketch(diffuser.sketch, 'flat-diffuser.svg')
+                return false
+            }
+        )
+    }
+      
+    $(drawReflector)
+
+
+</script>
+</head>
+<body>
+
+<body class="bg-light">
+
+<div class="container">
+<h1>Flat diffuser</h1>
+<a href="#" id="download-reflector">Download reflector</a>
+<a href="#" id="download-diffuser">Download diffuser</a>
+
+<div id="flat-sketch">
+</div>
+
+</div>
+
+
+</body>
+</html>
